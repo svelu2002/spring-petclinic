@@ -1,0 +1,41 @@
+version: "3"
+
+volumes:
+  dbdata:
+
+services:
+  psqldb:
+    image: postgres
+    environment:
+      - POSTGRES_DB=petclinic
+      - POSTGRES_PASSWORD=petclinic
+      - REST_API_URL=http://localhost:9966/petclinic/api/
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+  backend:
+    build:
+      context: ./spring-petclinic-rest
+    environment:
+       - spring.profiles.active=postgresql,spring-data-jpa
+       - spring.datasource.url=jdbc:postgresql://psqldb:5432/petclinic
+    command: ["java", "-jar", "spring-petclinic-rest-3.0.2.jar"]
+    ports:
+      - "9966:9966"
+    restart: on-failure
+    depends_on:
+      psqldb:
+        condition: service_healthy
+  frontend:
+    build: 
+      context: ./spring-petclinic-angular
+    environment:
+       - REST_API_URL=http://localhost:9966/petclinic/api/      
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
